@@ -1,6 +1,6 @@
 Manifest-Version: 1.0
-Plugin-Class: com.lauriewired.GhidraMCP
-Plugin-Name: GhidraMCP
-Plugin-Version: 1.0
-Plugin-Author: LaurieWired
-Plugin-Description: A custom plugin by LaurieWired
+Plugin-Class: com.lauriewired.GhidraMCPPlugin
+Plugin-Name: OGhidraMCP
+Plugin-Version: 1.1.0
+Plugin-Author: LaurieWired (Original), Modified by ezrealenoch
+Plugin-Description: Extended GhidraMCP with raw byte reading capability for AI-assisted reverse engineering
