@@ -39,11 +39,10 @@ if [ ! -d "$GHIDRA_INSTALL_DIR" ]; then
 fi
 
 # Create gradle.properties with the correct GHIDRA_INSTALL_DIR
-echo "# Path to your Ghidra installation directory" > OGhidraMCP/gradle.properties
-echo "GHIDRA_INSTALL_DIR=$GHIDRA_INSTALL_DIR" >> OGhidraMCP/gradle.properties
+echo "# Path to your Ghidra installation directory" > gradle.properties
+echo "GHIDRA_INSTALL_DIR=$GHIDRA_INSTALL_DIR" >> gradle.properties
 
 # Build the extension
-cd OGhidraMCP
 gradle buildExtension --info
 if [ $? -ne 0 ]; then
     echo "ERROR: Build failed!"
@@ -55,4 +54,4 @@ cd ..
 echo
 echo "Build completed successfully!"
 echo
-echo "The extension zip file is located in: OGhidraMCP/dist/"
+echo "The extension zip file is located in: dist/"

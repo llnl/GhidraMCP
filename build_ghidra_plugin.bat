@@ -33,14 +33,13 @@ IF NOT EXIST "%GHIDRA_INSTALL_DIR%" (
 )
 
 REM Create gradle.properties with the correct GHIDRA_INSTALL_DIR
-echo # Path to your Ghidra installation directory > OGhidraMCP\gradle.properties
+echo # Path to your Ghidra installation directory > gradle.properties
 REM Convert backslashes to forward slashes for Gradle and ensure no trailing spaces
 set "GRADLE_PATH=%GHIDRA_INSTALL_DIR:\=/%"
 REM Remove any trailing spaces from the path (this creates the file without trailing spaces)
-echo GHIDRA_INSTALL_DIR=%GRADLE_PATH%>> OGhidraMCP\gradle.properties
+echo GHIDRA_INSTALL_DIR=%GRADLE_PATH%>> gradle.properties
 
 REM Build the extension
-cd OGhidraMCP
 call gradle buildExtension
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Build failed!
@@ -52,6 +51,6 @@ cd ..
 echo.
 echo Build completed successfully!
 echo.
-echo The extension zip file is located in: OGhidraMCP\dist\
+echo The extension zip file is located in: dist\
 
 ENDLOCAL
