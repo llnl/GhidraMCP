@@ -1,61 +1,105 @@
-name: Build with Maven
+name: Build GhidraMCP Extension
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "OGhidraMCP-main" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "OGhidraMCP-main" ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact-suffix: linux-x64
+          - os: ubuntu-24.04-arm
+            artifact-suffix: linux-arm64
+          - os: macos-latest       # Apple Silicon (arm64)
+            artifact-suffix: macos-arm64
+          - os: macos-26-intel           # Intel (x64) — last Intel macOS runner
+            artifact-suffix: macos-x64
+          - os: windows-latest
+            artifact-suffix: windows-x64
+          - os: windows-11-arm
+            artifact-suffix: windows-arm64
+
+    runs-on: ${{ matrix.os }}
+
     env:
-      GHIDRA_VERSION: 11.3.2
-      GHIDRA_DATE: 20250415
-      GHIDRA_LIBS: >-
-        Features/Base/lib/Base.jar
-        Features/Decompiler/lib/Decompiler.jar
-        Framework/Docking/lib/Docking.jar
-        Framework/Generic/lib/Generic.jar
-        Framework/Project/lib/Project.jar
-        Framework/SoftwareModeling/lib/SoftwareModeling.jar
-        Framework/Utility/lib/Utility.jar
-        Framework/Gui/lib/Gui.jar
+      GHIDRA_VERSION: 12.0.3
+      GHIDRA_DATE: 20260210
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-    - name: Download Ghidra
-      run: |
-        wget --no-verbose -O ghidra.zip https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_${{ env.GHIDRA_VERSION }}_build/ghidra_${{ env.GHIDRA_VERSION }}_PUBLIC_${{ env.GHIDRA_DATE }}.zip
-        7z x -bd ghidra.zip
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
 
-    - name: Copy Ghidra libs
-      run: |
-        mkdir -p ./lib
-        for libfile in ${{ env.GHIDRA_LIBS }}
-          do echo "Copying ${libfile} to lib/"
-          cp ghidra_${{ env.GHIDRA_VERSION }}_PUBLIC/Ghidra/${libfile} ./lib/
-        done
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.12.1' # Requires upstream Ghidra project to add support for newer version
 
-    - name: Build with Maven
-      run: mvn clean package assembly:single
+      - name: Download and extract Ghidra (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/ghidra.zip" \
+            "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_${{ env.GHIDRA_VERSION }}_build/ghidra_${{ env.GHIDRA_VERSION }}_PUBLIC_${{ env.GHIDRA_DATE }}.zip"
+          unzip -q "$RUNNER_TEMP/ghidra.zip" -d "$RUNNER_TEMP"
+          echo "GHIDRA_INSTALL_DIR=$RUNNER_TEMP/ghidra_${{ env.GHIDRA_VERSION }}_PUBLIC" >> "$GITHUB_ENV"
 
-    - name: Assemble release directory
-      run: |
-        mkdir release
-        cp target/GhidraMCP-*-SNAPSHOT.zip release/
-        cp bridge_mcp_ghidra.py release/
+      - name: Download and extract Ghidra (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\ghidra.zip" `
+            "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_${{ env.GHIDRA_VERSION }}_build/ghidra_${{ env.GHIDRA_VERSION }}_PUBLIC_${{ env.GHIDRA_DATE }}.zip"
+          Expand-Archive -Path "$env:RUNNER_TEMP\ghidra.zip" -DestinationPath "$env:RUNNER_TEMP"
+          echo "GHIDRA_INSTALL_DIR=$env:RUNNER_TEMP\ghidra_${{ env.GHIDRA_VERSION }}_PUBLIC" >> $env:GITHUB_ENV
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: GhidraMCP-artifact
-        path: |
-          release/*
+      - name: Build extension (Unix)
+        if: runner.os != 'Windows'
+        run: bash build_ghidra_plugin.sh
+
+      - name: Build extension (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: build_ghidra_plugin.bat
+
+      - name: Debug - workspace layout
+        if: always()
+        shell: bash
+        run: |
+          echo "=== Current working directory ==="
+          pwd
+          echo
+          echo "=== GITHUB_WORKSPACE ==="
+          echo "$GITHUB_WORKSPACE"
+          echo
+          echo "=== File tree (excluding .git and ghidra install) ==="
+          find . -not -path './.git/*' \
+                 -not -path './ghidra_*/**' \
+                 -not -name '.git' \
+            | sort | sed 's|[^/]*/|  |g'
+          echo
+          echo "=== dist/ contents (if present) ==="
+          if [ -d dist ]; then
+            find dist -type f | sort
+            echo
+            find dist -type f | sort | xargs ls -lh
+          else
+            echo "dist/ directory does not exist"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: GhidraMCP-${{ matrix.artifact-suffix }}
+          path: dist/*.zip
+          if-no-files-found: error
